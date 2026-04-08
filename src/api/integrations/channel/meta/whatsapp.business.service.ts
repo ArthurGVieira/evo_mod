@@ -647,6 +647,31 @@ export class BusinessStartupService extends ChannelStartupService {
             source: 'unknown',
             instanceId: this.instanceId,
           };
+        } else if (message.type === 'unsupported') {
+          messageRaw = {
+            key,
+            pushName,
+            message: {
+              unsupportedMessage: {
+                type: message.unsupported?.type || 'unknown',
+              },
+              ...(message.errors?.length && {
+                errors: message.errors.map((err: any) => ({
+                  code: err.code,
+                  title: err.title,
+                  message: err.message,
+                  details: err.error_data?.details,
+                })),
+              }),
+            },
+            messageType: 'unsupportedMessage',
+            messageTimestamp: parseInt(message.timestamp) as number,
+            source: 'unknown',
+            instanceId: this.instanceId,
+          };
+          if (message.context) {
+            messageRaw.contextInfo = { stanzaId: message.context.id };
+          }
         } else {
           messageRaw = {
             key,
@@ -919,9 +944,9 @@ export class BusinessStartupService extends ChannelStartupService {
           message.type === 'contacts' ||
           message.type === 'interactive' ||
           message.type === 'button' ||
-          message.type === 'reaction'
+          message.type === 'reaction' ||
+          message.type === 'unsupported'
         ) {
-          // Procesar el mensaje normalmente
           this.messageHandle(content, database, settings);
         } else {
           this.logger.warn(`Tipo de mensaje no reconocido: ${message.type}`);
