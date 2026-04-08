@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     image: evolution-api:local-mod
     restart: unless-stopped
+    mem_limit: 2g
+    cpus: 1.5
     volumes:
       - evolution_mod:/evolution/instances
     ports:
