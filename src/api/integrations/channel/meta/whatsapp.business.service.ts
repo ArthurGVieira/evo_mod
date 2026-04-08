@@ -32,6 +32,26 @@ import FormData from 'form-data';
 import mimeTypes from 'mime-types';
 import { join } from 'path';
 
+/**
+ * WhatsApp Cloud API message.type values handled by the default parser (messageTextJson / renderMessageType).
+ * Any other type falls back to unknownMessage and is still sent to the webhook.
+ */
+const META_KNOWN_WEBHOOK_MESSAGE_TYPES = new Set<string>([
+  'text',
+  'image',
+  'video',
+  'audio',
+  'document',
+  'sticker',
+  'location',
+  'contacts',
+  'interactive',
+  'button',
+  'reaction',
+  'unsupported',
+  'template',
+]);
+
 export class BusinessStartupService extends ChannelStartupService {
   constructor(
     public readonly configService: ConfigService,
@@ -672,6 +692,33 @@ export class BusinessStartupService extends ChannelStartupService {
           if (message.context) {
             messageRaw.contextInfo = { stanzaId: message.context.id };
           }
+        } else if (!META_KNOWN_WEBHOOK_MESSAGE_TYPES.has(message.type)) {
+          this.logger.warn(`Meta message type not cataloged, using unknownMessage fallback: ${message.type}`);
+          messageRaw = {
+            key,
+            pushName,
+            message: {
+              unknownMessage: {
+                type: message.type || 'unknown',
+                payload: message,
+              },
+              ...(message.errors?.length && {
+                errors: message.errors.map((err: any) => ({
+                  code: err.code,
+                  title: err.title,
+                  message: err.message,
+                  details: err.error_data?.details,
+                })),
+              }),
+            },
+            messageType: 'unknownMessage',
+            messageTimestamp: parseInt(message.timestamp) as number,
+            source: 'unknown',
+            instanceId: this.instanceId,
+          };
+          if (message.context) {
+            messageRaw.contextInfo = { stanzaId: message.context.id };
+          }
         } else {
           messageRaw = {
             key,
@@ -931,26 +978,7 @@ export class BusinessStartupService extends ChannelStartupService {
       if (content.messages && content.messages.length > 0) {
         const message = content.messages[0];
         this.logger.log(`Tipo de mensaje recibido: ${message.type}`);
-
-        // Verificamos el tipo de mensaje antes de procesarlo
-        if (
-          message.type === 'text' ||
-          message.type === 'image' ||
-          message.type === 'video' ||
-          message.type === 'audio' ||
-          message.type === 'document' ||
-          message.type === 'sticker' ||
-          message.type === 'location' ||
-          message.type === 'contacts' ||
-          message.type === 'interactive' ||
-          message.type === 'button' ||
-          message.type === 'reaction' ||
-          message.type === 'unsupported'
-        ) {
-          this.messageHandle(content, database, settings);
-        } else {
-          this.logger.warn(`Tipo de mensaje no reconocido: ${message.type}`);
-        }
+        this.messageHandle(content, database, settings);
       } else if (content.statuses) {
         // Procesar actualizaciones de estado
         this.messageHandle(content, database, settings);

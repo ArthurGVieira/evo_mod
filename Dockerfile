@@ -10,7 +10,7 @@ LABEL contact="contato@evolution-api.com"
 WORKDIR /evolution
 
 COPY ./package*.json ./
-RUN npm ci --omit=dev --silent
+RUN npm install --omit=dev --legacy-peer-deps --ignore-scripts
 
 COPY ./dist ./dist
 COPY ./public ./public
